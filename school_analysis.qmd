@@ -1,0 +1,249 @@
+---
+title: "SDS 192 Mini-Project 3"
+subtitle: "SDS 192"
+author: 
+- name: Lindsay Poirier
+  affiliation: Smith College
+date: "`r format(Sys.Date(), '%B %e, %Y')`"
+editor: 
+  mode: source
+output: 
+  html_document:
+    fig_width: 7
+    fig_height: 6
+    fig_caption: true
+    theme: lumen
+    df_print: paged
+    code_folding: show
+knitr:
+  opts_chunk:
+    message: false
+    warning: false
+---
+
+
+```{r}
+#| include: false
+library(tidyverse)
+library(leaflet)
+library(tidycensus)
+library(viridis)
+library(sf)
+library(tigris)
+library(htmltools)
+```
+
+```{r}
+#| include: false
+
+# You should import this data, but you will not need to use these two data frames in your analysis. They are imported here to support the helper functions that I have provided you. 
+tigris_counties <- counties() |> mutate(GEOID = as.numeric(GEOID))
+census_variables <- load_variables(2020, "pl", cache = TRUE)
+
+```
+
+```{r}
+#| include: false
+
+# To perform your analysis you will need the total enrollment of students in each school by race and gender. I have provided example code below to import this data. Note that this code will only work after you have downloaded the CRDC data, unzipped the folder, and moved the folder into the correct directory. 
+
+crdc_enroll <- read.csv("2021-22-crdc-data/SCH/Enrollment.csv", stringsAsFactors = FALSE) |>
+  mutate(COMBOKEY= as.numeric(COMBOKEY)) |>
+  select(COMBOKEY:SCH_ENR_TR_X) |>
+  filter(!is.na(COMBOKEY))
+
+crdc_enroll <- replace(crdc_enroll, crdc_enroll == -9, NA) #NA values are initially recorded as -9 in this data
+
+# Copy and adjust code above for the metric you would like to analyze in this project. Be sure to identify and select the variables that break down that metric by race and gender. 
+
+# crdc_metric <- 
+
+crdc_metric <- replace(crdc_metric, crdc_metric == -9, NA)
+```
+
+```{r}
+#| include: false
+
+# Import the school location data from https://data-nces.opendata.arcgis.com/api/download/v1/items/bb54cfd626b74fb695cf8534b5f97c12/csv?layers=0 here. Be sure to convert to an sf object. This dataset has a CRS of 4269, and you should transform it into a CRS that is compatible with leaflet. 
+
+```
+
+```{r}
+#| include: false
+
+# DO NOT EDIT. I have provided the helper functions below, which you may leverage at any time to help you with the project. You should review all functions in advance. I have purposefully left off comments on these functions because I would like you to be able to interpret this code. 
+
+get_county_abbr <- function(county){
+  county %% 1000 
+}
+
+get_state_abbr <- function(county) {
+  round(county / 1000, 0)
+}
+
+get_county_lat_long <- function(county) {
+  my_county_cent <- tigris_counties |> 
+    filter(GEOID == county) |>
+    st_centroid()
+  my_county_lon <- st_coordinates(my_county_cent)[1]
+  my_county_lat <- st_coordinates(my_county_cent)[2]
+  return(c(my_county_lon, my_county_lat))
+}
+
+get_county_name <- function(county) {
+  my_county_name <- tigris_counties |> 
+    filter(GEOID == county) |>
+    pull(NAMELSAD)
+  return(my_county_name)
+}
+
+get_census_table_name <- function(table) {
+  name <- census_variables |>
+    filter(name == table) |>
+    mutate(label = str_remove(label, "!!Total:!!"),
+           label = str_replace_all(label, "!!", "<br>"),
+           label = str_trim(label)) |>
+    pull(label)
+  return(name)
+}
+
+get_census_table_by_race <- function(race) {
+  if (race == "_AM_")
+    return('P1_005N')
+  if (race == "_AS_")
+    return('P1_006N')
+  if (race == "_BL_")
+    return("P1_004N")
+  if (race == "_HI_")
+    return('P2_002N')
+  if (race == "_HP_")
+    return('P1_007N')
+  if (race == "_TR_")
+    return('P1_009N')
+  if (race == "_WH_")
+    return("P1_003N")
+  else{
+    warning("Race variable incorrectly formatted. Returning NA.")
+    return(NA)
+  }
+}
+
+get_race_from_abbr <- function(race) {
+  if (race == "_AM_")
+    return('American Indian and Alaska Native')
+  if (race == "_AS_")
+    return('Asian')
+  if (race == "_BL_")
+    return("Black or African American")
+  if (race == "_HI_")
+    return('Hispanic or Latino')
+  if (race == "_HP_")
+    return('Native Hawaiian and Other Pacific Islander')
+  if (race == "_TR_")
+    return('Two or more races')
+  if (race == "_WH_")
+    return("White")
+  else{
+    warning("Race variable incorrectly formatted. Returning NA.")
+    return(NA)
+  }
+}
+
+get_census_data <- function(county, race){
+  
+  county_abbr <- get_county_abbr(county) 
+  state_abbr <- get_state_abbr(county)
+  
+  census_tracts <- get_decennial(geography = "tract",
+                               county = county_abbr,
+                               variables = get_census_table_by_race(race),
+                               state =  state_abbr,
+                               summary_var = 'P1_001N',
+                               geometry = TRUE)
+
+  census_tracts <- st_transform(census_tracts, crs = 4326)
+  census_tracts <- census_tracts |> 
+    mutate(per_value = value/summary_value * 100)
+  return(census_tracts)
+}
+```
+
+```{r}
+
+# While not required, you may use this space to write helper functions for any of your functions below. Helper functions can make your code more readable and easily maintainable. If you plan to take SDS 270, writing these helper functions will be good practice. 
+
+```
+
+```{r}
+#| include: false
+create_plot <- function(county){
+
+  # Write function here.
+}
+
+```
+
+```{r}
+#| include: false
+
+create_map <- function(county, race) {
+  
+  # Write function here.
+  
+  return(metric_map)
+}
+```
+
+```{r}
+#| echo: false
+#| results: 'hide'
+
+# Set county and race variable for your blog post
+
+county <- c(25027) #County codes should be 4-5-digits. The first two digits represent the state FIPS code and the second three represent the county FIPS code. You can run a Google search to look up the FIPS code for any county in the U.S. 
+race <- c('_HI_') #Race variables can be any of the following: _AM_, _AS_, _BL_, _HI_, _HP_, _TR_, _WH_. See data dictionary or help function get_race_from_abbr() for an explanation of these abbreviations. 
+```
+
+```{r}
+#| include: false
+
+# SANDBOX. Before you moving code into your functions, I recommend that you use this space to test out pieces of what you need to accomplish (e.g. transforming the datasets, drafting the plot, initializing the map, etc. )
+```
+
+
+```{r}
+#| echo: false
+#| results: 'hide'
+
+# DO NOT EDIT. I have provided the code to call your functions for you. You may run this code in RStudio to test your functions.
+
+map(county, create_plot)
+map_list <- map(county, create_map, race)
+
+print(map_list)
+```
+
+```{r}
+#| include: false
+
+#DO NOT EDIT. This code loads the Javascript libraries needed to print our maps on Render. You do not need to touch this code, and you do not need to run it in RStudio.
+
+base_map <- leaflet(width = "100%") |>
+    setView(lat = 0, lng = 0, zoom = 0) |>
+    addProviderTiles(providers$CartoDB.Positron)
+base_map
+```
+
+```{r}
+#| results: 'asis'
+#| echo: false
+
+# DO NOT EDIT. This will print the maps when you Render the Quarto as HTML. You do not need to touch this code, and you do not need to run it in RStudio.
+
+print(htmltools::tagList(map_list))
+```
+
+
+# Blog post
+
+Compose your blog post here...
