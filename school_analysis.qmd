@@ -47,16 +47,19 @@ census_variables <- load_variables(2020, "pl", cache = TRUE)
 
 # To perform your analysis you will need the total enrollment of students in each school by race and gender. I have provided example code below to import this data. Note that this code will only work after you have downloaded the CRDC data, unzipped the folder, and moved the folder into the correct directory. 
 
-crdc_enroll <- read.csv("2021-22-crdc-data/SCH/Enrollment.csv", stringsAsFactors = FALSE) |>
+crdc_enroll <- read.csv("CRDC/School/Enrollment.csv", stringsAsFactors = FALSE) |>
   mutate(COMBOKEY= as.numeric(COMBOKEY)) |>
-  select(COMBOKEY:SCH_ENR_TR_X) |>
+  select(COMBOKEY:SCH_ENR_TR_F) |>
   filter(!is.na(COMBOKEY))
 
 crdc_enroll <- replace(crdc_enroll, crdc_enroll == -9, NA) #NA values are initially recorded as -9 in this data
 
 # Copy and adjust code above for the metric you would like to analyze in this project. Be sure to identify and select the variables that break down that metric by race and gender. 
 
-# crdc_metric <- 
+crdc_metric <- read.csv("CRDC/School/Restraint and Seclusion.csv", stringsAsFactors = FALSE) |>
+  mutate(COMBOKEY = as.numeric(COMBOKEY)) |>
+  select(COMBOKEY:SCH_RS_NONIDEA_MECH_504_F) |>
+  filter(!is.na(COMBOKEY))
 
 crdc_metric <- replace(crdc_metric, crdc_metric == -9, NA)
 ```
