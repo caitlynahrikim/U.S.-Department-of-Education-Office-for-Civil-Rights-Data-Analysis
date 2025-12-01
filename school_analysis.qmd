@@ -62,6 +62,12 @@ crdc_metric <- read.csv("CRDC/School/Restraint and Seclusion.csv", stringsAsFact
   filter(!is.na(COMBOKEY))
 
 crdc_metric <- replace(crdc_metric, crdc_metric == -9, NA)
+
+crdc_metric <- replace(crdc_metric, crdc_metric == -13, NA)
+
+crdc_metric <- replace(crdc_metric, crdc_metric == -11, NA)
+
+crdc_metric <- replace(crdc_metric, crdc_metric == -5, NA)
 ```
 
 ```{r}
@@ -236,12 +242,20 @@ crdc_metric_second_clean <- crdc_metric_first_clean |>
            into = c("SCH", "RS", "NONIDEA", "MECH", "RACE_RST", "SEX_RST"),
            sep = "_")
 
-crdc_metric_cleaned <- crdc_metric_second_clean |>
+crdc_metric_third_clean <- crdc_metric_second_clean |>
   mutate(JJ_RST = JJ) |>
   select(COMBOKEY, JJ_RST, RACE_RST, SEX_RST, RST_VALUES)
 
+crdc_metric_total <- crdc_metric_third_clean |>
+  filter(!is.na(RST_VALUES)) |>
+  group_by(COMBOKEY) |>
+  summarize(RST_TOT = sum(RST_VALUES))
+
+crdc_metric_cleaned <- crdc_metric_third_clean |>
+  left_join(crdc_metric_total, by = "COMBOKEY")
+
 crdc_metric_cleaned_onlyyes <- crdc_metric_cleaned |>
-  filter(RST_VALUES == 1)
+  filter(RST_VALUES > 0)
 
 crdc_enroll_first_clean <- crdc_enroll |>
   pivot_longer(cols = starts_with("SCH"),
@@ -268,7 +282,10 @@ crdc_enroll_cleaned <- inner_join(crdc_enroll_third_clean, crdc_enroll_total, by
   mutate(PCT_ENR = (ENROLLMENT/TOTAL_ENR)*100) |>
   filter(TYPE == "School")
 
-crdc_join <- crdc_metric_cleaned_onlyyes |>
+crdc_join <- crdc_metric_cleaned |>
+  left_join(crdc_enroll_cleaned, by = "COMBOKEY")
+
+crdc_join_onlyyes <- crdc_metric_cleaned_onlyyes |>
   left_join(crdc_enroll_cleaned, by = "COMBOKEY")
 
 crdc_race_gender_match <- crdc_join |>
@@ -281,6 +298,8 @@ crdc_race_gender_match <- crdc_join |>
 
 rm(crdc_metric_first_clean,
    crdc_metric_second_clean,
+   crdc_metric_third_clean,
+   crdc_metric_total,
    crdc_enroll_first_clean,
    crdc_enroll_second_clean,
    crdc_enroll_third_clean,
