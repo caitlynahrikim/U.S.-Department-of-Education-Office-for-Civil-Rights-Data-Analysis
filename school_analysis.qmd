@@ -69,6 +69,20 @@ crdc_metric <- replace(crdc_metric, crdc_metric == -9, NA)
 
 # Import the school location data from https://data-nces.opendata.arcgis.com/api/download/v1/items/bb54cfd626b74fb695cf8534b5f97c12/csv?layers=0 here. Be sure to convert to an sf object. This dataset has a CRS of 4269, and you should transform it into a CRS that is compatible with leaflet. 
 
+schl_loc <- read.csv("Public_School_Locations_2021-22.csv")|>
+  st_as_sf(coords = c("LON", "LAT"),
+           crs = 4269) |>
+  st_transform(crs = st_crs(4326)) |>
+  filter(STATE == "CA", CNTY == 6075)
+
+schl_map <- leaflet(width = "100%") |>
+  setView(lat = 37.77, lng = -122.4, zoom = 10) |>
+  addProviderTiles("CartoDB.Positron") |>
+  addCircleMarkers(data = schl_loc,
+                   radius = 3,
+                   stroke = FALSE,
+                   fillOpacity = .5)
+
 ```
 
 ```{r}
@@ -211,6 +225,66 @@ race <- c('_HI_') #Race variables can be any of the following: _AM_, _AS_, _BL_,
 #| include: false
 
 # SANDBOX. Before you moving code into your functions, I recommend that you use this space to test out pieces of what you need to accomplish (e.g. transforming the datasets, drafting the plot, initializing the map, etc. )
+
+crdc_metric_first_clean <- crdc_metric |>
+  pivot_longer(cols = starts_with("SCH_RS_NONIDEA_MECH"),
+               names_to = "type",
+               values_to = "RST_VALUES")
+
+crdc_metric_second_clean <- crdc_metric_first_clean |>
+  separate(col = type,
+           into = c("SCH", "RS", "NONIDEA", "MECH", "RACE_RST", "SEX_RST"),
+           sep = "_")
+
+crdc_metric_cleaned <- crdc_metric_second_clean |>
+  mutate(JJ_RST = JJ) |>
+  select(COMBOKEY, JJ_RST, RACE_RST, SEX_RST, RST_VALUES)
+
+crdc_metric_cleaned_onlyyes <- crdc_metric_cleaned |>
+  filter(RST_VALUES == 1)
+
+crdc_enroll_first_clean <- crdc_enroll |>
+  pivot_longer(cols = starts_with("SCH"),
+               names_to = "type",
+               values_to = "ENROLLMENT")
+
+crdc_enroll_second_clean <- crdc_enroll_first_clean |>
+  separate(col = type,
+           into = c("SCH", "PSorENR", "RACE_ENR", "SEX_ENR"),
+           sep = "_")
+
+crdc_enroll_third_clean <- crdc_enroll_second_clean |>
+  mutate(TYPE = case_when(PSorENR == "PSENR" ~ "Preschool",
+                          TRUE ~ "School"),
+         JJ_ENR = JJ) |>
+  select(COMBOKEY, JJ_ENR, TYPE, RACE_ENR, SEX_ENR, ENROLLMENT) |>
+  filter(!is.na(ENROLLMENT))
+
+crdc_enroll_total <- crdc_enroll_third_clean |>
+  group_by(COMBOKEY) |>
+  summarize(TOTAL_ENR = sum(ENROLLMENT))
+
+crdc_enroll_cleaned <- inner_join(crdc_enroll_third_clean, crdc_enroll_total, by = "COMBOKEY") |>
+  mutate(PCT_ENR = (ENROLLMENT/TOTAL_ENR)*100) |>
+  filter(TYPE == "School")
+
+crdc_join <- crdc_metric_cleaned_onlyyes |>
+  left_join(crdc_enroll_cleaned, by = "COMBOKEY")
+
+crdc_race_gender_match <- crdc_join |>
+  filter(RACE_RST == RACE_ENR, SEX_RST == SEX_ENR)
+```
+
+```{r}
+#| echo: false
+#| results: 'hide'
+
+rm(crdc_metric_first_clean,
+   crdc_metric_second_clean,
+   crdc_enroll_first_clean,
+   crdc_enroll_second_clean,
+   crdc_enroll_third_clean,
+   crdc_enroll_total)
 ```
 
 
