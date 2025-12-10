@@ -213,8 +213,101 @@ get_filters_for_combokey <- function(data1, data2) {
 ```{r}
 #| include: false
 create_plot <- function(county){
-
-  # Write function here.
+  crdc_metric_clean <- crdc_metric |>
+    pivot_longer(cols = starts_with("SCH_RS_NONIDEA_MECH"),
+                 names_to = "type",
+                 values_to = "RST_VALUES") |>
+    separate(col = type,
+             into = c("SCH", "RS", "NONIDEA", "MECH", "RACE_RST", "SEX_RST"),
+             sep = "_") |>
+    mutate(JJ_RST = JJ) |>
+    select(COMBOKEY, JJ_RST, RACE_RST, SEX_RST, RST_VALUES)
+  
+  crdc_join <- crdc_metric_clean |>
+    left_join(crdc_enroll, by = "COMBOKEY") |>
+    select(-starts_with("SCH_PSENR"),
+           -starts_with("TOT_PSENR")) |>
+    mutate(RACE_RST_am = str_replace(RACE_RST,"AM", "American Indian and Alaska Native"),
+           RACE_RST_bl = str_replace(RACE_RST_am, "BL", "Black or African American"),
+           RACE_RST_as = str_replace(RACE_RST_bl, "AS", "Asian"),
+           RACE_RST_hi = str_replace(RACE_RST_as, "HI", "Hispanic or Latino"),
+           RACE_RST_hp = str_replace(RACE_RST_hi, "HP", "Native Hawaiian and Other Pacific Islander"),
+           RACE_RST_tr = str_replace(RACE_RST_hp, "TR", "Two or more races"),
+           RACE_RST_CHR = str_replace(RACE_RST_tr, "WH", "White")) |>
+    select(-RACE_RST_am,
+           -RACE_RST_bl,
+           -RACE_RST_as,
+           -RACE_RST_hi,
+           -RACE_RST_hp,
+           -RACE_RST_tr) |>
+    filter(!is.na(RST_VALUES),
+           RACE_RST != "504",
+           RACE_RST != "LEP")
+  
+  schl_loc_county <- read.csv("Public_School_Locations_2021-22.csv") |>
+    filter(STFIP == get_state_abbr(county), CNTY == county)
+  
+  crdc_join_county <- get_filters_for_combokey(crdc_join, schl_loc_county)
+  
+  county_tot_enr_calc <-
+    crdc_join_county |>
+    mutate(tot_hi_m = sum(SCH_ENR_HI_M),
+         tot_hi_f = sum(SCH_ENR_HI_F),
+         tot_am_m = sum(SCH_ENR_AM_M),
+         tot_am_f = sum(SCH_ENR_AM_F),
+         tot_as_m = sum(SCH_ENR_AS_M),
+         tot_as_f = sum(SCH_ENR_AS_F),
+         tot_bl_m = sum(SCH_ENR_BL_M),
+         tot_bl_f = sum(SCH_ENR_BL_F),
+         tot_hp_m = sum(SCH_ENR_HP_M),
+         tot_hp_f = sum(SCH_ENR_HP_F),
+         tot_wh_m = sum(SCH_ENR_WH_M),
+         tot_wh_f = sum(SCH_ENR_WH_F),
+         tot_tr_m = sum(SCH_ENR_TR_M),
+         tot_tr_f = sum(SCH_ENR_TR_F)) |>
+  select(-SCH_ENR_HI_M,
+         -SCH_ENR_HI_F,
+         -SCH_ENR_AM_M,
+         -SCH_ENR_AM_F,
+         -SCH_ENR_AS_M,
+         -SCH_ENR_AS_F,
+         -SCH_ENR_BL_M,
+         -SCH_ENR_BL_F,
+         -SCH_ENR_HP_M,
+         -SCH_ENR_HP_F,
+         -SCH_ENR_WH_M,
+         -SCH_ENR_WH_F,
+         -SCH_ENR_TR_M,
+         -SCH_ENR_TR_F)
+  
+  county_tot_rst_calc <-
+    crdc_join_county |>
+    group_by(RACE_RST_CHR, SEX_RST) |>
+    summarize(tot_racesex_rst = sum(RST_VALUES))
+  
+  county_pct_join <-
+    left_join(county_tot_enr_calc, county_tot_rst_calc, by = c("RACE_RST_CHR", "SEX_RST")) |>
+    pivot_longer(cols = tot_hi_m:tot_tr_f,
+                 names_to = "RACE_SEX_ENR",
+                 values_to = "RACE_ENR") |>
+    mutate(RACE_SEX_ENR = str_to_upper(RACE_SEX_ENR),
+           pct_rst = case_when(str_ends(RACE_SEX_ENR, paste0("_", RACE_RST, "_", SEX_RST)) ~
+                                 (tot_racesex_rst/RACE_ENR)*100,
+                               TRUE ~ NA)) |>
+    filter(!is.na(pct_rst))
+  
+  county_pct_join |>
+    ggplot(aes(x = RACE_RST_CHR, y = pct_rst, fill = SEX_RST)) +
+    geom_col(position = "dodge") +
+    coord_flip() +
+    theme_minimal() +
+    labs(title = paste("Percent of Students Mechanically Restrained",
+                       get_county_name(county),
+                       "2021-2022"),
+         x = "Race",
+         y = "Percent Mechanically Restrained",
+         fill = "Gender")
+  
 }
 
 ```
