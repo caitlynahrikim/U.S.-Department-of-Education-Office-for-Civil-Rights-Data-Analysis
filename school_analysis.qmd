@@ -195,6 +195,19 @@ get_census_data <- function(county, race){
 
 # While not required, you may use this space to write helper functions for any of your functions below. Helper functions can make your code more readable and easily maintainable. If you plan to take SDS 270, writing these helper functions will be good practice. 
 
+get_filters_for_combokey <- function(data1, data2) {
+  
+   crdc_join_for_filters <-
+    data1
+   schl_loc_combo <- data2 |>
+     mutate(COMBOKEY = NCESSCH)
+   
+   crdc_join_county <- schl_loc_combo |>
+     inner_join(crdc_join_for_filters, by = "COMBOKEY")
+   
+  return(crdc_join_county)
+}
+
 ```
 
 ```{r}
