@@ -317,7 +317,74 @@ create_plot <- function(county){
 
 create_map <- function(county, race) {
   
-  # Write function here.
+  #saved a string that metric column names share 
+  #saved a string that enrolled column names share
+  metric_phrase <- paste0("SCH_RS_NONIDEA_MECH", race)
+  enrolled_phrase <- paste0("SCH_ENR", race)
+  
+  #converted abbreviated race input into full phrase
+  full_race_phrase <- get_race_from_abbr(race)
+  
+  schl_loc <- read.csv("Public_School_Locations_2021-22.csv")|>
+  st_as_sf(coords = c("LON", "LAT"),
+           crs = 4269) |>
+  st_transform(crs = st_crs(4326)) |>
+  filter(STATE == "TX", CNTY == as.numeric(county))
+  
+  #renaming NCESSCH column to COMBOKEY
+  colnames(schl_loc)[4] <- "COMBOKEY"
+
+  #dataset of students who faced restraint by gender for each public school in input county (metric)
+  students_restrained_df <- left_join(schl_loc, crdc_metric, by = "COMBOKEY") |> select(COMBOKEY, geometry, starts_with(metric_phrase))
+
+  #dataset of public schools from input county and their total enrollments
+  enroll_schl_df <- left_join(schl_loc, crdc_enroll, by = "COMBOKEY") |> 
+    st_drop_geometry() |>
+    select(COMBOKEY, starts_with(enrolled_phrase))
+
+  #dataset with metric, enrollment, and metric percentages per public school from input county
+  schl_and_metric_df <- left_join(students_restrained_df, enroll_schl_df, by = "COMBOKEY") |>
+    mutate(
+      total_restrained = rowSums(across((starts_with(metric_phrase))), na.rm = TRUE), 
+      total_enrolled = rowSums(across((starts_with(enrolled_phrase))), na.rm = TRUE),
+      restrained_perc = (total_restrained/total_enrolled)*100)
+
+  race_tracts <- get_census_data(county, race)
+  
+  race_tracts <- race_tracts |> mutate(percent_race = (value/summary_value)*100)
+  
+  pal_bin_census_county_perc <- colorBin(palette="YlOrRd",
+                                         domain = race_tracts$percent_race,
+                                         bins = 5)
+  
+  pal_bin_school_metric_perc <- colorBin(palette="Blues",
+                                         domain = schl_and_metric_df$restrained_perc,
+                                         bins = 5)
+  
+  county_lat_long <- get_county_lat_long(county)
+
+  metric_map <- leaflet(width = "100%") |>
+    setView(lat = county_lat_long[2], lng = county_lat_long[1], zoom = 9.4) |>
+    addProviderTiles("CartoDB.Positron")|>
+    addPolygons(data = race_tracts,
+               weight = 1,
+               color = "black",
+               fillColor = ~pal_bin_census_county_perc(percent_race),
+               fillOpacity = 0.4) |>
+    addCircleMarkers(data = schl_and_metric_df,
+                     weight = 0.7,
+                     radius = 5,
+                     color = "black",
+                     fillColor = ~pal_bin_school_metric_perc(restrained_perc),
+                     fillOpacity = .7) |>
+    addLegend(data = schl_and_metric_df,
+              title = paste0("% ", full_race_phrase, " Students Mechanically Restrained"),
+              pal = pal_bin_school_metric_perc,
+              values = ~restrained_perc) |>
+    addLegend(data = race_tracts,
+              title = paste0("% Population ", full_race_phrase),
+              pal = pal_bin_census_county_perc,
+              values = ~percent_race)
   
   return(metric_map)
 }
@@ -368,6 +435,67 @@ crdc_join <- crdc_metric_clean |>
   filter(!is.na(RST_VALUES),
          RACE_RST != "504",
          RACE_RST != "LEP")
+
+
+#renaming NCESSCH column to COMBOKEY
+colnames(schl_loc)[4] <- "COMBOKEY"
+
+#black students who faced restraint by gender for each public school in Fulton County (metric)
+fulton_BL_students_restraint_df <- left_join(schl_loc, crdc_metric, by = "COMBOKEY") |> select(COMBOKEY, geometry, SCH_RS_NONIDEA_MECH_BL_M, SCH_RS_NONIDEA_MECH_BL_F)
+
+#dataset with public schools in Fulton and their total enrollments
+fulton_BL_enroll_schl <- left_join(schl_loc, crdc_enroll, by = "COMBOKEY") |> 
+  st_drop_geometry() |>
+  select(COMBOKEY, SCH_ENR_BL_M, SCH_ENR_BL_F)
+
+#dataset with metric, enrollment, and metric percentages per public school in Fulton
+fulton_schl <- left_join(fulton_BL_students_restraint_df, fulton_BL_enroll_schl, by = "COMBOKEY") |>
+  select(COMBOKEY, geometry, SCH_RS_NONIDEA_MECH_BL_M, SCH_RS_NONIDEA_MECH_BL_F, SCH_ENR_BL_M, SCH_ENR_BL_F) |>
+  mutate(
+    total_restrained = rowSums(across(c(SCH_RS_NONIDEA_MECH_BL_M, SCH_RS_NONIDEA_MECH_BL_F)), na.rm = TRUE), 
+    total_enrolled = rowSums(across(c(SCH_ENR_BL_M, SCH_ENR_BL_F)), na.rm = TRUE),
+    restrained_perc = (total_restrained/total_enrolled)*100)
+
+schl_map <- leaflet(width = "100%") |>
+  setView(lat = 33.8, lng = -84.39, zoom = 9.4) |>
+  addProviderTiles("CartoDB.Positron")
+
+fulton_bl_tracts <- get_census_data(13121, "_BL_")
+
+fulton_bl_tracts <- fulton_bl_tracts |> mutate(percent_black = (value/summary_value)*100)
+
+pal_bin_census_county_perc <- colorBin(palette="YlOrRd",
+                                       domain = fulton_bl_tracts$percent_black,
+                                       bins = 5)
+
+pal_bin_school_metric_perc <- colorBin(palette="Blues",
+                                       domain = fulton_schl$restrained_perc,
+                                       bins = 5)
+
+schl_map |>
+  addPolygons(data = fulton_bl_tracts,
+             weight = 1,
+             color = "black",
+             fillColor = ~pal_bin_census_county_perc(percent_black),
+             fillOpacity = 0.4) |>
+  addCircleMarkers(data = fulton_schl,
+                   weight = 0.7,
+                   radius = 5,
+                   color = "black",
+                   fillColor = ~pal_bin_school_metric_perc(restrained_perc),
+                   fillOpacity = .7) |>
+  addLegend(data = fulton_schl,
+            title = "% Black mechanically restrained",
+            pal = pal_bin_school_metric_perc,
+            values = ~restrained_perc) |>
+  addLegend(data = fulton_bl_tracts,
+            title = "% Black Population - Tract",
+            pal = pal_bin_census_county_perc,
+            values = ~percent_black)
+
+rm(bl_students_restraint_seclusion)
+rm(fulton_BL_enroll_df)
+rm(fulton_BL_enroll_schl)
 ```
 
 ```{r}
