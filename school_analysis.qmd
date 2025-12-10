@@ -79,7 +79,7 @@ schl_loc <- read.csv("Public_School_Locations_2021-22.csv")|>
   st_as_sf(coords = c("LON", "LAT"),
            crs = 4269) |>
   st_transform(crs = st_crs(4326)) |>
-  filter(STATE == "CA", CNTY == county)
+  filter(STATE == "GA", CNTY == 13121)
 
 schl_map <- leaflet(width = "100%") |>
   setView(lat = 33.8, lng = -84.39, zoom = 9.4) |>
@@ -89,8 +89,6 @@ schl_map <- leaflet(width = "100%") |>
                    stroke = FALSE,
                    fillOpacity = .5)
 schl_map
-
-get_county_abbr(13121)
 
 ```
 
@@ -198,22 +196,17 @@ get_census_data <- function(county, race){
 
 # While not required, you may use this space to write helper functions for any of your functions below. Helper functions can make your code more readable and easily maintainable. If you plan to take SDS 270, writing these helper functions will be good practice. 
 
-get_filters_for_combokey <- function(leaids) {
+get_filters_for_combokey <- function(data1, data2) {
   
    crdc_join_for_filters <-
-    crdc_join
-  
-  x = length(leaids)
-  for (i in x) {
-    crdc_join_for_filters <-
-      crdc_join_for_filters |>
-      mutate(na_if_right = case_when(str_detect(as.character(COMBOKEY), paste0("^", as.character(leaids[i]))) ~ NA))
-  }
-  
-  crdc_join_for_filters <-
-    crdc_join_for_filters |>
-    filter(is.na(na_if_right))
-  return(crdc_join_for_filters)
+    data1
+   schl_loc_combo <- data2 |>
+     mutate(COMBOKEY = NCESSCH)
+   
+   crdc_join_county <- schl_loc_combo |>
+     inner_join(crdc_join_for_filters, by = "COMBOKEY")
+   
+  return(crdc_join_county)
 }
 
 ```
@@ -252,14 +245,10 @@ create_plot <- function(county){
            RACE_RST != "504",
            RACE_RST != "LEP")
   
-  county_leaids <-
-    schl_loc |>
-    filter(CNTY == county) |>
-    group_by(LEAID) |>
-    summarize(count = n()) |>
-    pull(LEAID)
+  schl_loc_county <- read.csv("Public_School_Locations_2021-22.csv") |>
+    filter(STFIP == get_state_abbr(county), CNTY == county)
   
-  crdc_join_county <- get_filters_for_combokey(county_leaids)
+  crdc_join_county <- get_filters_for_combokey(crdc_join, schl_loc_county)
   
   county_tot_enr_calc <-
     crdc_join_county |>
@@ -307,12 +296,15 @@ create_plot <- function(county){
                                  (tot_racesex_rst/RACE_ENR)*100,
                                TRUE ~ NA)) |>
     filter(!is.na(pct_rst))
+  
   county_pct_join |>
     ggplot(aes(x = RACE_RST_CHR, y = pct_rst, fill = SEX_RST)) +
     geom_col(position = "dodge") +
     coord_flip() +
     theme_minimal() +
-    labs(title = paste("Percent of Students Mechanically Restrained", get_county_name(county), "2021-2022"),
+    labs(title = paste("Percent of Students Mechanically Restrained",
+                       get_county_name(county),
+                       "2021-2022"),
          x = "Race",
          y = "Percent Mechanically Restrained",
          fill = "Gender")
@@ -320,139 +312,6 @@ create_plot <- function(county){
 }
 
 ```
-
-```{r}
-#| include: false
-# Plot sandbox
-
-unique(schl_loc$LEAID)
-
-crdc_join_woc <-
-  crdc_join |>
-  filter(str_detect(as.character(COMBOKEY), "^2500001")|
-         str_detect(as.character(COMBOKEY), "^2500002")|
-         str_detect(as.character(COMBOKEY), "^2500036")|
-         str_detect(as.character(COMBOKEY), "^2500045")|
-         str_detect(as.character(COMBOKEY), "^2500051")|
-         str_detect(as.character(COMBOKEY), "^2500073")|
-         str_detect(as.character(COMBOKEY), "^2500587")|
-         str_detect(as.character(COMBOKEY), "^2502040")|
-         str_detect(as.character(COMBOKEY), "^2502160")|
-         str_detect(as.character(COMBOKEY), "^2502220")|
-         str_detect(as.character(COMBOKEY), "^2502580")|
-         str_detect(as.character(COMBOKEY), "^2502710")|
-         str_detect(as.character(COMBOKEY), "^2502715")|
-         str_detect(as.character(COMBOKEY), "^2503120")|
-         str_detect(as.character(COMBOKEY), "^2503750")|
-         str_detect(as.character(COMBOKEY), "^2504230")|
-         str_detect(as.character(COMBOKEY), "^2504360")|
-         str_detect(as.character(COMBOKEY), "^2504890")|
-         str_detect(as.character(COMBOKEY), "^2505130")|
-         str_detect(as.character(COMBOKEY), "^2505370")|
-         str_detect(as.character(COMBOKEY), "^2505880")|
-         str_detect(as.character(COMBOKEY), "^2506300")|
-         str_detect(as.character(COMBOKEY), "^2506720")|
-         str_detect(as.character(COMBOKEY), "^2506780")|
-         str_detect(as.character(COMBOKEY), "^2507080")|
-         str_detect(as.character(COMBOKEY), "^2507680")|
-         str_detect(as.character(COMBOKEY), "^2507860")|
-         str_detect(as.character(COMBOKEY), "^2507890")|
-         str_detect(as.character(COMBOKEY), "^2508050")|
-         str_detect(as.character(COMBOKEY), "^2508280")|
-         str_detect(as.character(COMBOKEY), "^2508310")|
-         str_detect(as.character(COMBOKEY), "^2508760")|
-         str_detect(as.character(COMBOKEY), "^2508880")|
-         str_detect(as.character(COMBOKEY), "^2508910")|
-         str_detect(as.character(COMBOKEY), "^2508940")|
-         str_detect(as.character(COMBOKEY), "^2509540")|
-         str_detect(as.character(COMBOKEY), "^2510770")|
-         str_detect(as.character(COMBOKEY), "^2510980")|
-         str_detect(as.character(COMBOKEY), "^2511010")|
-         str_detect(as.character(COMBOKEY), "^2511050")|
-         str_detect(as.character(COMBOKEY), "^2511150")|
-         str_detect(as.character(COMBOKEY), "^2511310")|
-         str_detect(as.character(COMBOKEY), "^2511400")|
-         str_detect(as.character(COMBOKEY), "^2511490")|
-         str_detect(as.character(COMBOKEY), "^2511850")|
-         str_detect(as.character(COMBOKEY), "^2511880")|
-         str_detect(as.character(COMBOKEY), "^2512100")|
-         str_detect(as.character(COMBOKEY), "^2512240")|
-         str_detect(as.character(COMBOKEY), "^2512390")|
-         str_detect(as.character(COMBOKEY), "^2512600")|
-         str_detect(as.character(COMBOKEY), "^2513080")|
-         str_detect(as.character(COMBOKEY), "^2513230"))
-
-crdc_join_woc_yes <-
-  crdc_join_woc |>
-  filter(RST_VALUES > 1)
-  
-woc_tot_enr_calc <-
-  crdc_join_woc |>
-  mutate(tot_hi_m = sum(SCH_ENR_HI_M),
-         tot_hi_f = sum(SCH_ENR_HI_F),
-         tot_am_m = sum(SCH_ENR_AM_M),
-         tot_am_f = sum(SCH_ENR_AM_F),
-         tot_as_m = sum(SCH_ENR_AS_M),
-         tot_as_f = sum(SCH_ENR_AS_F),
-         tot_bl_m = sum(SCH_ENR_BL_M),
-         tot_bl_f = sum(SCH_ENR_BL_F),
-         tot_hp_m = sum(SCH_ENR_HP_M),
-         tot_hp_f = sum(SCH_ENR_HP_F),
-         tot_wh_m = sum(SCH_ENR_WH_M),
-         tot_wh_f = sum(SCH_ENR_WH_F),
-         tot_tr_m = sum(SCH_ENR_TR_M),
-         tot_tr_f = sum(SCH_ENR_TR_F)) |>
-  select(-SCH_ENR_HI_M,
-         -SCH_ENR_HI_F,
-         -SCH_ENR_AM_M,
-         -SCH_ENR_AM_F,
-         -SCH_ENR_AS_M,
-         -SCH_ENR_AS_F,
-         -SCH_ENR_BL_M,
-         -SCH_ENR_BL_F,
-         -SCH_ENR_HP_M,
-         -SCH_ENR_HP_F,
-         -SCH_ENR_WH_M,
-         -SCH_ENR_WH_F,
-         -SCH_ENR_TR_M,
-         -SCH_ENR_TR_F)
-
-woc_tot_rst_calc <-
-  crdc_join_woc |>
-  group_by(RACE_RST_CHR, SEX_RST) |>
-  summarize(tot_racesex_rst = sum(RST_VALUES))
-
-
-woc_pct_join <-
-  left_join(woc_tot_enr_calc, woc_tot_rst_calc, by = c("RACE_RST_CHR", "SEX_RST")) |>
-  pivot_longer(cols = tot_hi_m:tot_tr_f,
-               names_to = "RACE_SEX_ENR",
-               values_to = "RACE_ENR") |>
-  mutate(RACE_SEX_ENR = str_to_upper(RACE_SEX_ENR)) |>
-  mutate(pct_rst = case_when(str_ends(RACE_SEX_ENR, paste0("_", RACE_RST, "_", SEX_RST)) ~
-                     (tot_racesex_rst/RACE_ENR)*100,
-                   TRUE ~ NA)) |>
-  filter(!is.na(pct_rst))
-  
-woc_pct_join |>  
-  ggplot(aes(x = RACE_RST_CHR, y = pct_rst, fill = SEX_RST)) +
-  geom_col(position = "dodge") +
-  coord_flip() +
-  theme_minimal() +
-  labs(title = paste("Percent of Students Mechanically Restrained", get_county_name(25027), "2021-2022"),
-       x = "Race",
-       y = "Percent Mechanically Restrained",
-       fill = "Gender")
-
-county_leaid <-
-  schl_loc |>
-  filter(CNTY == 25027) |>
-  group_by(LEAID) |>
-  summarize(count = n()) |>
-  pull(LEAID)
-  
-```
-
 
 ```{r}
 #| include: false
@@ -471,7 +330,7 @@ create_map <- function(county, race) {
 
 # Set county and race variable for your blog post
 
-county <- c(06001) #County codes should be 4-5-digits. The first two digits represent the state FIPS code and the second three represent the county FIPS code. You can run a Google search to look up the FIPS code for any county in the U.S. 
+county <- c(25027) #County codes should be 4-5-digits. The first two digits represent the state FIPS code and the second three represent the county FIPS code. You can run a Google search to look up the FIPS code for any county in the U.S. 
 race <- c('_HI_') #Race variables can be any of the following: _AM_, _AS_, _BL_, _HI_, _HP_, _TR_, _WH_. See data dictionary or help function get_race_from_abbr() for an explanation of these abbreviations. 
 ```
 
