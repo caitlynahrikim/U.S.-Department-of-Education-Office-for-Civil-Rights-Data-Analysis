@@ -2,7 +2,7 @@
 title: "SDS 192 Mini-Project 3 Contributions"
 subtitle: "SDS 192"
 author: 
-- name: Author One
+- name: Lily Schroeder
   affiliation: Smith College
 - name: Author Two
   affiliation: Smith College
@@ -24,7 +24,7 @@ output:
 
 # Group Member 1: NAME
 
-Fill response here...
+Both of my teammates did good work. It was difficult to meet because of people being sick and Thanksgiving break but I was able to meet with Caitlyn a couple of times and that was really helpful. Although Annabelle was very sick and had to go on medical leave for a little bit, she still did great work and really helped us at the end with the blog post. She was very responsive
 
 # Group Member 2: NAME
 
