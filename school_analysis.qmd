@@ -301,6 +301,7 @@ create_plot <- function(county){
     geom_col(position = "dodge") +
     coord_flip() +
     theme_minimal() +
+    scale_y_continuous(labels = scales::label_number()) +
     labs(title = paste("Percent of Students Mechanically Restrained",
                        get_county_name(county),
                        "2021-2022"),
