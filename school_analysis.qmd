@@ -79,10 +79,10 @@ schl_loc <- read.csv("Public_School_Locations_2021-22.csv")|>
   st_as_sf(coords = c("LON", "LAT"),
            crs = 4269) |>
   st_transform(crs = st_crs(4326)) |>
-  filter(STATE == "CA", CNTY == 6075)
+  filter(STATE == "TX", CNTY == 48201)
 
 schl_map <- leaflet(width = "100%") |>
-  setView(lat = 37.77, lng = -122.4, zoom = 10) |>
+  setView(lat = 29.86, lng = -95.39, zoom = 10) |>
   addProviderTiles("CartoDB.Positron") |>
   addCircleMarkers(data = schl_loc,
                    radius = 3,
@@ -396,8 +396,8 @@ create_map <- function(county, race) {
 
 # Set county and race variable for your blog post
 
-county <- c(25027) #County codes should be 4-5-digits. The first two digits represent the state FIPS code and the second three represent the county FIPS code. You can run a Google search to look up the FIPS code for any county in the U.S. 
-race <- c('_HI_') #Race variables can be any of the following: _AM_, _AS_, _BL_, _HI_, _HP_, _TR_, _WH_. See data dictionary or help function get_race_from_abbr() for an explanation of these abbreviations. 
+county <- c(48201) #County codes should be 4-5-digits. The first two digits represent the state FIPS code and the second three represent the county FIPS code. You can run a Google search to look up the FIPS code for any county in the U.S. 
+race <- c('_BL_') #Race variables can be any of the following: _AM_, _AS_, _BL_, _HI_, _HP_, _TR_, _WH_. See data dictionary or help function get_race_from_abbr() for an explanation of these abbreviations. 
 ```
 
 ```{r}
