@@ -47,24 +47,47 @@ census_variables <- load_variables(2020, "pl", cache = TRUE)
 
 # To perform your analysis you will need the total enrollment of students in each school by race and gender. I have provided example code below to import this data. Note that this code will only work after you have downloaded the CRDC data, unzipped the folder, and moved the folder into the correct directory. 
 
-crdc_enroll <- read.csv("2021-22-crdc-data/SCH/Enrollment.csv", stringsAsFactors = FALSE) |>
+crdc_enroll <- read.csv("CRDC/School/Enrollment.csv", stringsAsFactors = FALSE) |>
   mutate(COMBOKEY= as.numeric(COMBOKEY)) |>
-  select(COMBOKEY:SCH_ENR_TR_X) |>
+  select(COMBOKEY:SCH_ENR_TR_F) |>
   filter(!is.na(COMBOKEY))
 
 crdc_enroll <- replace(crdc_enroll, crdc_enroll == -9, NA) #NA values are initially recorded as -9 in this data
 
 # Copy and adjust code above for the metric you would like to analyze in this project. Be sure to identify and select the variables that break down that metric by race and gender. 
 
-# crdc_metric <- 
+crdc_metric <- read.csv("CRDC/School/Restraint and Seclusion.csv", stringsAsFactors = FALSE) |>
+  mutate(COMBOKEY = as.numeric(COMBOKEY)) |>
+  select(COMBOKEY:SCH_RS_NONIDEA_MECH_504_F) |>
+  filter(!is.na(COMBOKEY))
 
 crdc_metric <- replace(crdc_metric, crdc_metric == -9, NA)
+
+crdc_metric <- replace(crdc_metric, crdc_metric == -13, NA)
+
+crdc_metric <- replace(crdc_metric, crdc_metric == -11, NA)
+
+crdc_metric <- replace(crdc_metric, crdc_metric == -5, NA)
 ```
 
 ```{r}
 #| include: false
 
 # Import the school location data from https://data-nces.opendata.arcgis.com/api/download/v1/items/bb54cfd626b74fb695cf8534b5f97c12/csv?layers=0 here. Be sure to convert to an sf object. This dataset has a CRS of 4269, and you should transform it into a CRS that is compatible with leaflet. 
+
+schl_loc <- read.csv("Public_School_Locations_2021-22.csv")|>
+  st_as_sf(coords = c("LON", "LAT"),
+           crs = 4269) |>
+  st_transform(crs = st_crs(4326)) |>
+  filter(STATE == "TX", CNTY == 48201)
+
+schl_map <- leaflet(width = "100%") |>
+  setView(lat = 29.86, lng = -95.39, zoom = 10) |>
+  addProviderTiles("CartoDB.Positron") |>
+  addCircleMarkers(data = schl_loc,
+                   radius = 3,
+                   stroke = FALSE,
+                   fillOpacity = .5)
 
 ```
 
@@ -172,13 +195,120 @@ get_census_data <- function(county, race){
 
 # While not required, you may use this space to write helper functions for any of your functions below. Helper functions can make your code more readable and easily maintainable. If you plan to take SDS 270, writing these helper functions will be good practice. 
 
+get_filters_for_combokey <- function(data1, data2) {
+  
+   crdc_join_for_filters <-
+    data1
+   schl_loc_combo <- data2 |>
+     mutate(COMBOKEY = NCESSCH)
+   
+   crdc_join_county <- schl_loc_combo |>
+     inner_join(crdc_join_for_filters, by = "COMBOKEY")
+   
+  return(crdc_join_county)
+}
+
 ```
 
 ```{r}
 #| include: false
 create_plot <- function(county){
-
-  # Write function here.
+  crdc_metric_clean <- crdc_metric |>
+    pivot_longer(cols = starts_with("SCH_RS_NONIDEA_MECH"),
+                 names_to = "type",
+                 values_to = "RST_VALUES") |>
+    separate(col = type,
+             into = c("SCH", "RS", "NONIDEA", "MECH", "RACE_RST", "SEX_RST"),
+             sep = "_") |>
+    mutate(JJ_RST = JJ) |>
+    select(COMBOKEY, JJ_RST, RACE_RST, SEX_RST, RST_VALUES)
+  
+  crdc_join <- crdc_metric_clean |>
+    left_join(crdc_enroll, by = "COMBOKEY") |>
+    select(-starts_with("SCH_PSENR"),
+           -starts_with("TOT_PSENR")) |>
+    mutate(RACE_RST_am = str_replace(RACE_RST,"AM", "American Indian and Alaska Native"),
+           RACE_RST_bl = str_replace(RACE_RST_am, "BL", "Black or African American"),
+           RACE_RST_as = str_replace(RACE_RST_bl, "AS", "Asian"),
+           RACE_RST_hi = str_replace(RACE_RST_as, "HI", "Hispanic or Latino"),
+           RACE_RST_hp = str_replace(RACE_RST_hi, "HP", "Native Hawaiian and Other Pacific Islander"),
+           RACE_RST_tr = str_replace(RACE_RST_hp, "TR", "Two or more races"),
+           RACE_RST_CHR = str_replace(RACE_RST_tr, "WH", "White")) |>
+    select(-RACE_RST_am,
+           -RACE_RST_bl,
+           -RACE_RST_as,
+           -RACE_RST_hi,
+           -RACE_RST_hp,
+           -RACE_RST_tr) |>
+    filter(!is.na(RST_VALUES),
+           RACE_RST != "504",
+           RACE_RST != "LEP")
+  
+  schl_loc_county <- read.csv("Public_School_Locations_2021-22.csv") |>
+    filter(STFIP == get_state_abbr(county), CNTY == county)
+  
+  crdc_join_county <- get_filters_for_combokey(crdc_join, schl_loc_county)
+  
+  county_tot_enr_calc <-
+    crdc_join_county |>
+    mutate(tot_hi_m = sum(SCH_ENR_HI_M),
+         tot_hi_f = sum(SCH_ENR_HI_F),
+         tot_am_m = sum(SCH_ENR_AM_M),
+         tot_am_f = sum(SCH_ENR_AM_F),
+         tot_as_m = sum(SCH_ENR_AS_M),
+         tot_as_f = sum(SCH_ENR_AS_F),
+         tot_bl_m = sum(SCH_ENR_BL_M),
+         tot_bl_f = sum(SCH_ENR_BL_F),
+         tot_hp_m = sum(SCH_ENR_HP_M),
+         tot_hp_f = sum(SCH_ENR_HP_F),
+         tot_wh_m = sum(SCH_ENR_WH_M),
+         tot_wh_f = sum(SCH_ENR_WH_F),
+         tot_tr_m = sum(SCH_ENR_TR_M),
+         tot_tr_f = sum(SCH_ENR_TR_F)) |>
+  select(-SCH_ENR_HI_M,
+         -SCH_ENR_HI_F,
+         -SCH_ENR_AM_M,
+         -SCH_ENR_AM_F,
+         -SCH_ENR_AS_M,
+         -SCH_ENR_AS_F,
+         -SCH_ENR_BL_M,
+         -SCH_ENR_BL_F,
+         -SCH_ENR_HP_M,
+         -SCH_ENR_HP_F,
+         -SCH_ENR_WH_M,
+         -SCH_ENR_WH_F,
+         -SCH_ENR_TR_M,
+         -SCH_ENR_TR_F)
+  
+  county_tot_rst_calc <-
+    crdc_join_county |>
+    group_by(RACE_RST_CHR, SEX_RST) |>
+    summarize(tot_racesex_rst = sum(RST_VALUES))
+  
+  county_pct_join <-
+    left_join(county_tot_enr_calc, county_tot_rst_calc, by = c("RACE_RST_CHR", "SEX_RST")) |>
+    pivot_longer(cols = tot_hi_m:tot_tr_f,
+                 names_to = "RACE_SEX_ENR",
+                 values_to = "RACE_ENR") |>
+    mutate(RACE_SEX_ENR = str_to_upper(RACE_SEX_ENR),
+           pct_rst = case_when(str_ends(RACE_SEX_ENR, paste0("_", RACE_RST, "_", SEX_RST)) ~
+                                 (tot_racesex_rst/RACE_ENR)*100,
+                               TRUE ~ NA)) |>
+    filter(!is.na(pct_rst))
+  
+  county_pct_join |>
+    ggplot(aes(x = RACE_RST_CHR, y = pct_rst, fill = SEX_RST)) +
+    geom_col(position = "dodge") +
+    coord_flip() +
+    theme_minimal() +
+    scale_y_continuous(labels = scales::label_number()) +
+    labs(title = paste("Percent of Students Mechanically Restrained",
+                       get_county_name(county),
+                       "2021-2022"),
+         x = "Race",
+         y = "Percent Mechanically Restrained",
+         fill = "Gender")
+  
 }
 
 ```
@@ -188,7 +318,74 @@ create_plot <- function(county){
 
 create_map <- function(county, race) {
   
-  # Write function here.
+  #saved a string that metric column names share 
+  #saved a string that enrolled column names share
+  metric_phrase <- paste0("SCH_RS_NONIDEA_MECH", race)
+  enrolled_phrase <- paste0("SCH_ENR", race)
+  
+  #converted abbreviated race input into full phrase
+  full_race_phrase <- get_race_from_abbr(race)
+  
+  schl_loc <- read.csv("Public_School_Locations_2021-22.csv")|>
+  st_as_sf(coords = c("LON", "LAT"),
+           crs = 4269) |>
+  st_transform(crs = st_crs(4326)) |>
+  filter(STATE == "TX", CNTY == as.numeric(county))
+  
+  #renaming NCESSCH column to COMBOKEY
+  colnames(schl_loc)[4] <- "COMBOKEY"
+
+  #dataset of students who faced restraint by gender for each public school in input county (metric)
+  students_restrained_df <- left_join(schl_loc, crdc_metric, by = "COMBOKEY") |> select(COMBOKEY, geometry, starts_with(metric_phrase))
+
+  #dataset of public schools from input county and their total enrollments
+  enroll_schl_df <- left_join(schl_loc, crdc_enroll, by = "COMBOKEY") |> 
+    st_drop_geometry() |>
+    select(COMBOKEY, starts_with(enrolled_phrase))
+
+  #dataset with metric, enrollment, and metric percentages per public school from input county
+  schl_and_metric_df <- left_join(students_restrained_df, enroll_schl_df, by = "COMBOKEY") |>
+    mutate(
+      total_restrained = rowSums(across((starts_with(metric_phrase))), na.rm = TRUE), 
+      total_enrolled = rowSums(across((starts_with(enrolled_phrase))), na.rm = TRUE),
+      restrained_perc = (total_restrained/total_enrolled)*100)
+
+  race_tracts <- get_census_data(county, race)
+  
+  race_tracts <- race_tracts |> mutate(percent_race = (value/summary_value)*100)
+  
+  pal_bin_census_county_perc <- colorBin(palette="YlOrRd",
+                                         domain = race_tracts$percent_race,
+                                         bins = 5)
+  
+  pal_bin_school_metric_perc <- colorBin(palette="Blues",
+                                         domain = schl_and_metric_df$restrained_perc,
+                                         bins = 5)
+  
+  county_lat_long <- get_county_lat_long(county)
+
+  metric_map <- leaflet(width = "100%") |>
+    setView(lat = county_lat_long[2], lng = county_lat_long[1], zoom = 9.4) |>
+    addProviderTiles("CartoDB.Positron")|>
+    addPolygons(data = race_tracts,
+               weight = 1,
+               color = "black",
+               fillColor = ~pal_bin_census_county_perc(percent_race),
+               fillOpacity = 0.4) |>
+    addCircleMarkers(data = schl_and_metric_df,
+                     weight = 0.7,
+                     radius = 5,
+                     color = "black",
+                     fillColor = ~pal_bin_school_metric_perc(restrained_perc),
+                     fillOpacity = .7) |>
+    addLegend(data = schl_and_metric_df,
+              title = paste0("% ", full_race_phrase, " Students Mechanically Restrained"),
+              pal = pal_bin_school_metric_perc,
+              values = ~restrained_perc) |>
+    addLegend(data = race_tracts,
+              title = paste0("% Population ", full_race_phrase),
+              pal = pal_bin_census_county_perc,
+              values = ~percent_race)
   
   return(metric_map)
 }
@@ -200,16 +397,107 @@ create_map <- function(county, race) {
 
 # Set county and race variable for your blog post
 
-county <- c(25027) #County codes should be 4-5-digits. The first two digits represent the state FIPS code and the second three represent the county FIPS code. You can run a Google search to look up the FIPS code for any county in the U.S. 
-race <- c('_HI_') #Race variables can be any of the following: _AM_, _AS_, _BL_, _HI_, _HP_, _TR_, _WH_. See data dictionary or help function get_race_from_abbr() for an explanation of these abbreviations. 
+county <- c(48201) #County codes should be 4-5-digits. The first two digits represent the state FIPS code and the second three represent the county FIPS code. You can run a Google search to look up the FIPS code for any county in the U.S. 
+race <- c('_BL_') #Race variables can be any of the following: _AM_, _AS_, _BL_, _HI_, _HP_, _TR_, _WH_. See data dictionary or help function get_race_from_abbr() for an explanation of these abbreviations. 
 ```
 
 ```{r}
 #| include: false
 
 # SANDBOX. Before you moving code into your functions, I recommend that you use this space to test out pieces of what you need to accomplish (e.g. transforming the datasets, drafting the plot, initializing the map, etc. )
-```
 
+crdc_metric_clean <- crdc_metric |>
+  pivot_longer(cols = starts_with("SCH_RS_NONIDEA_MECH"),
+               names_to = "type",
+               values_to = "RST_VALUES") |>
+  separate(col = type,
+           into = c("SCH", "RS", "NONIDEA", "MECH", "RACE_RST", "SEX_RST"),
+           sep = "_") |>
+  mutate(JJ_RST = JJ) |>
+  select(COMBOKEY, JJ_RST, RACE_RST, SEX_RST, RST_VALUES)
+
+crdc_join <- crdc_metric_clean |>
+  left_join(crdc_enroll, by = "COMBOKEY") |>
+  select(-starts_with("SCH_PSENR"),
+         -starts_with("TOT_PSENR")) |>
+  mutate(RACE_RST_am = str_replace(RACE_RST,"AM", "American Indian and Alaska Native"),
+         RACE_RST_bl = str_replace(RACE_RST_am, "BL", "Black or African American"),
+         RACE_RST_as = str_replace(RACE_RST_bl, "AS", "Asian"),
+         RACE_RST_hi = str_replace(RACE_RST_as, "HI", "Hispanic or Latino"),
+         RACE_RST_hp = str_replace(RACE_RST_hi, "HP", "Native Hawaiian and Other Pacific Islander"),
+         RACE_RST_tr = str_replace(RACE_RST_hp, "TR", "Two or more races"),
+         RACE_RST_CHR = str_replace(RACE_RST_tr, "WH", "White")) |>
+  select(-RACE_RST_am,
+         -RACE_RST_bl,
+         -RACE_RST_as,
+         -RACE_RST_hi,
+         -RACE_RST_hp,
+         -RACE_RST_tr) |>
+  filter(!is.na(RST_VALUES),
+         RACE_RST != "504",
+         RACE_RST != "LEP")
+
+
+#renaming NCESSCH column to COMBOKEY
+colnames(schl_loc)[4] <- "COMBOKEY"
+
+#black students who faced restraint by gender for each public school in Fulton County (metric)
+fulton_BL_students_restraint_df <- left_join(schl_loc, crdc_metric, by = "COMBOKEY") |> select(COMBOKEY, geometry, SCH_RS_NONIDEA_MECH_BL_M, SCH_RS_NONIDEA_MECH_BL_F)
+
+#dataset with public schools in Fulton and their total enrollments
+fulton_BL_enroll_schl <- left_join(schl_loc, crdc_enroll, by = "COMBOKEY") |> 
+  st_drop_geometry() |>
+  select(COMBOKEY, SCH_ENR_BL_M, SCH_ENR_BL_F)
+
+#dataset with metric, enrollment, and metric percentages per public school in Fulton
+fulton_schl <- left_join(fulton_BL_students_restraint_df, fulton_BL_enroll_schl, by = "COMBOKEY") |>
+  select(COMBOKEY, geometry, SCH_RS_NONIDEA_MECH_BL_M, SCH_RS_NONIDEA_MECH_BL_F, SCH_ENR_BL_M, SCH_ENR_BL_F) |>
+  mutate(
+    total_restrained = rowSums(across(c(SCH_RS_NONIDEA_MECH_BL_M, SCH_RS_NONIDEA_MECH_BL_F)), na.rm = TRUE), 
+    total_enrolled = rowSums(across(c(SCH_ENR_BL_M, SCH_ENR_BL_F)), na.rm = TRUE),
+    restrained_perc = (total_restrained/total_enrolled)*100)
+
+schl_map <- leaflet(width = "100%") |>
+  setView(lat = 33.8, lng = -84.39, zoom = 9.4) |>
+  addProviderTiles("CartoDB.Positron")
+
+fulton_bl_tracts <- get_census_data(13121, "_BL_")
+
+fulton_bl_tracts <- fulton_bl_tracts |> mutate(percent_black = (value/summary_value)*100)
+
+pal_bin_census_county_perc <- colorBin(palette="YlOrRd",
+                                       domain = fulton_bl_tracts$percent_black,
+                                       bins = 5)
+
+pal_bin_school_metric_perc <- colorBin(palette="Blues",
+                                       domain = fulton_schl$restrained_perc,
+                                       bins = 5)
+
+schl_map |>
+  addPolygons(data = fulton_bl_tracts,
+             weight = 1,
+             color = "black",
+             fillColor = ~pal_bin_census_county_perc(percent_black),
+             fillOpacity = 0.4) |>
+  addCircleMarkers(data = fulton_schl,
+                   weight = 0.7,
+                   radius = 5,
+                   color = "black",
+                   fillColor = ~pal_bin_school_metric_perc(restrained_perc),
+                   fillOpacity = .7) |>
+  addLegend(data = fulton_schl,
+            title = "% Black mechanically restrained",
+            pal = pal_bin_school_metric_perc,
+            values = ~restrained_perc) |>
+  addLegend(data = fulton_bl_tracts,
+            title = "% Black Population - Tract",
+            pal = pal_bin_census_county_perc,
+            values = ~percent_black)
+
+rm(bl_students_restraint_seclusion)
+rm(fulton_BL_enroll_df)
+rm(fulton_BL_enroll_schl)
+```
 
 ```{r}
 #| echo: false
@@ -246,4 +534,8 @@ print(htmltools::tagList(map_list))
 
 # Blog post
 
-Compose your blog post here...
+For this analysis, we chose to focus on mechanical restraint in Harris County, Texas (county in Texas with the highest total Black or African American population). For the plot, we examined how the percent of students that were mechanically restrained differed across race and gender. For the map, we examined the percent of Black or African American students throughout Harris County. In addition to this, we also showcased the percent of Black or African American students that were mechanically restrained at each school in the county. 
+
+When looking at the plot, in Harris County, Texas the race and gender with the highest percent of students mechanically restrained was Hispanic or Latino male. The second highest race and gender was Black or African American Females. When comparing these percentages to White students, it appears that they are almost double. This suggests that there may be racial disparities occurring for (Hispanic or Latino and Black and African American) students with the use of mechanical restraint in the county. When looking at the map, there are many schools that appear white (0.0 - 0.2) or grey (NA) when looking at mechanical restraint percentages. This showcases that there is not a lot of data related to mechanical restraint in this county. However, in one instance, there is a school (circle) that is of a darker blue shade (0.8 - 1.0). This may suggest that there are instances of racial discrimination occurring at this particular school in Harris County. 
+
+When thinking about our plot, it is clear that there are higher percentages of mechanical restraint occurring for Hispanic or Latino males and Black or African American females. In addition to this, through looking at our map, though there is not a lot of data related to mechanical restraint in Harris county, there are some schools in tracts (North and South of Houston) that have high population percentages for Black and African Americans. When looking at the CRDC datasets, it is important to note that specific schools are excluded. The dataset does not include schools that are not receiving federal assistance from the CRDC. On the United States Department of Education website, it says tribal schools “are not required to collect and submit data to the CRDC.” In addition to this, schools in United States territories are also excluded from the dataset as they are not required to submit data to the CRDC. When looking at the Restraint and Seclusion dataset, gender is only split into two categories “M” (male) and “F” (female). The dataset fails to include all gender identities, such as transgender and nonbinary. A benefit of these datasets is they can be used to highlight disparities in schools. With clear data on specific issues, more funding and resources can be given to schools that need assistance. Though the dataset was created to aid in prohibiting discrimination, it is harmful because it does not include representation for all people. Specific groups of students, like transgender and nonbinary students, may not receive help or be recognized because they are excluded from the dataset.
