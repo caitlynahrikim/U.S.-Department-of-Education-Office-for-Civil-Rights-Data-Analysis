@@ -2,7 +2,7 @@
 title: "SDS 192 Mini-Project 3 Contributions"
 subtitle: "SDS 192"
 author: 
-- name: Author One
+- name: Lily Schroeder
   affiliation: Smith College
 - name: Author Two
   affiliation: Smith College
@@ -22,9 +22,9 @@ output:
 ---
 
 
-# Group Member 1: NAME
+# Group Member 1: Lily Schroeder
 
-Fill response here...
+Both of my teammates did good work. It was difficult to meet because of people being sick and Thanksgiving break but I was able to meet with Caitlyn a couple of times and that was really helpful. Although Annabelle was very sick and had to go on medical leave for a little bit, she still did great work and really helped us at the end with the blog post. She was very responsive over text even when she couldn't meet in person. Caitlyn did really good work and put a lot of effort into creating the map function. She helped me when I had questions and was quick to reach out when something I added didn't make sense. She spent a lot of time on her work both in meetings and outside.
 
 # Group Member 2: NAME
 
