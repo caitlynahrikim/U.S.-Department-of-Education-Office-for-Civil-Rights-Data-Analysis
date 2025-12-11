@@ -6,7 +6,7 @@ author:
   affiliation: Smith College
 - name: Caitlyn Kim
   affiliation: Smith College
-- name: Author Three
+- name: Annabelle Daniels 
   affiliation: Smith College
 date: "`r format(Sys.Date(), '%B %e, %Y')`"
 source:
@@ -30,6 +30,6 @@ Both of my teammates did good work. It was difficult to meet because of people b
 
 I think I worked well with my teammates. We were all busy with our own schedules, but we were able to actively respond to each other about our updates and questions on the project in our groupchat. We also met virtually to work and discuss the project. I created a map with the metric percentages and race percentages and then used that to create the map function. Annabelle helped me debug/test code for the map function. 
 
-# Group Member 3: NAME
+# Group Member 3: Annabelle Daniels 
 
-Fill response here...
+Both of my teammates did great work. I was very sick for the majority of the project, so I was not able to contribute as much work as I should have. Both Lily and Caitlyn were very responsive over text and put a lot of effort into the group project. I worked on the blog post and tried to help Caitlyn with testing code for the map function. 
