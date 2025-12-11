@@ -4,7 +4,7 @@ subtitle: "SDS 192"
 author: 
 - name: Lily Schroeder
   affiliation: Smith College
-- name: Author Two
+- name: Caitlyn Kim
   affiliation: Smith College
 - name: Author Three
   affiliation: Smith College
@@ -26,9 +26,9 @@ output:
 
 Both of my teammates did good work. It was difficult to meet because of people being sick and Thanksgiving break but I was able to meet with Caitlyn a couple of times and that was really helpful. Although Annabelle was very sick and had to go on medical leave for a little bit, she still did great work and really helped us at the end with the blog post. She was very responsive over text even when she couldn't meet in person. Caitlyn did really good work and put a lot of effort into creating the map function. She helped me when I had questions and was quick to reach out when something I added didn't make sense. She spent a lot of time on her work both in meetings and outside.
 
-# Group Member 2: NAME
+# Group Member 2: Caitlyn Kim
 
-Fill response here...
+I think I worked well with my teammates. We were all busy with our own schedules, but we were able to actively respond to each other about our updates and questions on the project in our groupchat. We also met virtually to work and discuss the project. I created a map with the metric percentages and race percentages and then used that to create the map function. Annabelle helped me debug/test code for the map function. 
 
 # Group Member 3: NAME
 
